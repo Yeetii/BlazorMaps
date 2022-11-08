@@ -2,7 +2,11 @@
 
   <PropertyGroup>
     <TargetFramework>net5.0</TargetFramework>
-	<RootNamespace>FisSst.BlazorMaps</RootNamespace>
+    <RootNamespace>FisSst.BlazorMaps</RootNamespace>
+    <PackageId>FisSst.BlazorMaps.Fork</PackageId>
+    <Version>1.0.2</Version>
+    <Authors>Erik Magnusson</Authors>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
 
