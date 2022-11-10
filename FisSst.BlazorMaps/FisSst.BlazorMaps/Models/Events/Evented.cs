@@ -7,91 +7,110 @@ using System.Threading.Tasks;
 namespace FisSst.BlazorMaps
 {
     /// <summary>
-    /// An abstract class for beings that are interactive, i.e. they
+    /// An abstract class for layers that are interactive, i.e. they
     /// can react on events such as 'click', 'mouseover' etc.
     /// </summary>
     public abstract class Evented : JsReferenceBase
     {
-        private const string ClickJsFunction = "click";
-        private const string DblClickJsFunction = "dblclick";
-        private const string MouseDownJsFunction = "mousedown";
-        private const string MouseUpJsFunction = "mouseup";
-        private const string MouseOverJsFunction = "mouseover";
-        private const string MouseOutJsFunction = "mouseout";
-        private const string ContextMenuJsFunction = "contextmenu";
-        private const string OffJsFunction = "off";
+        protected const string OffJsFunction = "off";
         protected IEventedJsInterop EventedJsInterop;
-        private readonly IDictionary<string, Func<MouseEvent, Task>> MouseEvents = new Dictionary<string, Func<MouseEvent, Task>>();
+        protected readonly IDictionary<string, Func<MouseEvent, Task>> MouseEvents = new Dictionary<string, Func<MouseEvent, Task>>();
+        protected readonly IDictionary<string, Func<LocationEvent, Task>> LocationEvents = new Dictionary<string, Func<LocationEvent, Task>>();
 
-        public async Task OnClick(Func<MouseEvent, Task> callback)
+        #region AddEventListener
+
+        protected async Task AddMouseEventListener(MouseEventType eventType, Func<MouseEvent, Task> callback)
         {
-            await On(ClickJsFunction, callback);
+            await this.AddEventListener(eventType, callback, this.MouseEvents);
         }
 
-        public async Task OnDblClick(Func<MouseEvent, Task> callback)
+        protected async Task AddLocationEventListener(LocationEventType eventType, Func<LocationEvent, Task> callback)
         {
-            await On(DblClickJsFunction, callback);
-        }
+            await this.AddEventListener(eventType, callback, this.LocationEvents);
+        }        
 
-        public async Task OnMouseDown(Func<MouseEvent, Task> callback)
+        private async Task AddEventListener<TEvent, TEventType>(
+            TEventType eventTypeValue,
+            Func<TEvent, Task> callback,
+            IDictionary<string, Func<TEvent, Task>> events)
+                where TEvent : Event
+                where TEventType : struct, Enum
         {
-            await On(MouseDownJsFunction, callback);
-        }
-
-        public async Task OnMouseUp(Func<MouseEvent, Task> callback)
-        {
-            await On(MouseUpJsFunction, callback);
-        }
-
-        public async Task OnMouseOver(Func<MouseEvent, Task> callback)
-        {
-            await On(MouseOverJsFunction, callback);
-        }
-
-        public async Task OnMouseOut(Func<MouseEvent, Task> callback)
-        {
-            await On(MouseOutJsFunction, callback);
-        }
-
-        public async Task OnContextMenu(Func<MouseEvent, Task> callback)
-        {
-            await On(ContextMenuJsFunction, callback);
-        }
-
-        private async Task On(string eventType, Func<MouseEvent, Task> callback)
-        {
-            if (this.MouseEvents.ContainsKey(eventType))
+            string eventType = Enum.GetName(eventTypeValue);
+            if (events.ContainsKey(eventType))
             {
                 return;
             }
-
-            this.MouseEvents.Add(eventType, callback);
-            await this.On(eventType);
+            events.Add(eventType, callback);
+            await this.AddEventListener(eventTypeValue, eventType);
         }
 
-        private async Task On(string eventType)
+        private async Task AddEventListener<TEventType>(TEventType eventTypeValue, string eventType)
+            where TEventType : Enum
         {
             DotNetObjectReference<Evented> eventedClass = DotNetObjectReference.Create(this);
-            await this.EventedJsInterop.OnCallback(eventedClass, this.JsReference, eventType);
+            await this.EventedJsInterop.AddEventListenerInJs(eventedClass, this.JsReference, eventTypeValue, eventType);
         }
 
-        public async Task Off(string eventType)
+        #endregion
+
+        #region RemoveEventListener
+
+        protected async Task RemoveMouseEventListener(MouseEventType eventType)
         {
-            if (this.MouseEvents.ContainsKey(eventType))
+            await this.RemoveEventListener(eventType, this.MouseEvents);
+        }
+
+        protected async Task RemoveLocationEventListener(LocationEventType eventType)
+        {
+            await this.RemoveEventListener(eventType, this.LocationEvents);
+        }
+
+        private async Task RemoveEventListener<TEvent, TEventType>(
+            TEventType eventTypeValue, 
+            IDictionary<string, Func<TEvent, Task>> events)
+                where TEvent : Event
+                where TEventType : struct, Enum
+        {
+            string eventType = Enum.GetName(eventTypeValue);
+            if (events.ContainsKey(eventType))
             {
-                this.MouseEvents.Remove(eventType);
+                events.Remove(eventType);
                 await this.JsReference.InvokeAsync<IJSObjectReference>(OffJsFunction, eventType);
             }
         }
 
+        #endregion
+
+        #region OnCallbackCalled
+
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
         [JSInvokable]
-        public async Task OnCallback(string eventType, MouseEvent mouseEvent)
+        public async Task OnMouseCallbackCalled(string eventType, MouseEvent mouseEvent)
         {
-            bool isEvented = this.MouseEvents.TryGetValue(eventType, out Func<MouseEvent, Task> callback);
+            await this.OnCallbackCalled(eventType, mouseEvent, this.MouseEvents);
+        }
+
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        [JSInvokable]
+        public async Task OnLocationCallbackCalled(string eventType, LocationEvent locationEvent)
+        {
+            await this.OnCallbackCalled(eventType, locationEvent, this.LocationEvents);
+        }
+
+        private async Task OnCallbackCalled<TEvent>(
+            string eventType, 
+            TEvent mouseEvent,
+            IDictionary<string, Func<TEvent, Task>> events)
+                where TEvent : Event
+        {
+            bool isEvented = events.TryGetValue(eventType, out Func<TEvent, Task> callback);
             if (isEvented)
             {
                 await callback.Invoke(mouseEvent);
             }
         }
+
+        #endregion 
     }
 }
